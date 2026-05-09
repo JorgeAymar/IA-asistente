@@ -1,0 +1,51 @@
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chatapp
+      POSTGRES_USER: chatapp
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-chatapp}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Next.js App ─────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Base de datos — apunta al servicio "db"
+      DATABASE_URL: postgresql://chatapp:${DB_PASSWORD:-chatapp}@db:5432/chatapp?schema=public
+
+      # Ollama externo — configurar con la URL del servidor Ollama remoto
+      OLLAMA_URL: ${OLLAMA_URL:-http://localhost:11434}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-deepseek-v4-flash:cloud}
+
+      # NextAuth
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+
+      # GitHub OAuth
+      AUTH_GITHUB_ID: ${AUTH_GITHUB_ID}
+      AUTH_GITHUB_SECRET: ${AUTH_GITHUB_SECRET}
+
+      # App
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-AI Asistente}
+
+# ── Volúmenes persistentes ───────────────────────────────────────────────────
+volumes:
+  postgres_data:
